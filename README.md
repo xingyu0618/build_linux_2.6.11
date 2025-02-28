@@ -11,6 +11,7 @@ in fact a quiet full-fledge kernel, and it's easier to understand
 than newer kernel versions.
 
 ### How to built it
+
 Kernel 2.6.11 was released in 2005. So I need to find a Linux Distro that released in that year.
 What I found was Debian Sarge(Debian 3.1) which released in 2005-06-06. And luckily there's a Docker image of it.
 
@@ -34,6 +35,7 @@ make ARCH=i386 -j$number_of_cpus
 It's quite fast to build this old kernel in modern hardwares.
 
 ### generate compile_commands.json
+
 Though successfully built it, our goal is to read the code, understand the code.
 I find clangd+vscode are awesome tools help to read large project written in C.
 
@@ -55,6 +57,7 @@ So we need detour a bit to see how to run old 32-bit gcc in modern
 64-bit machine.
 
 ### tweak old gcc to work in modern Linux
+
 In the previous successed built, the toolchain used is
 ```
 gcc 3.3.5
@@ -113,6 +116,7 @@ exec gcc33/usr/bin/gcc-3.3 -B gcc33/usr/bin/ "$@"
 then `make ARCH=i386 CC=./ccwrap`
 
 ### use bear to generate compile_commands.json
+
 bear works by using PRELOAD provided by glibc.
 By using PRELOAD, you can run a shlib even before glibc
 being loaded by dynamic linker.
@@ -139,6 +143,9 @@ apt install gcc bear make
 cd /root/build_linux_2.6.11/linux-2.6.11
 make ARCH=i386 CC=./ccwrap
 ```
+
+### How to build a super-mini kernel
+TODO
 
 ### How to disable compile optimization
 TODO

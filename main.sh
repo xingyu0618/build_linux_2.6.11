@@ -154,8 +154,8 @@ else
 end
 END
 )
-  echo "$code" > tools/disable_optimization.rb
-  ruby -i -n tools/disable_optimization.rb $target_file
+  echo "$code" > tmp/disable_optimization.rb
+  ruby -i -n tmp/disable_optimization.rb $target_file
 
   echo "[*] disable optimization...done"
 }
@@ -240,7 +240,7 @@ unpack_kernel_source() {
 
 trap_error
 
-mkdir -p download gcc33 gccwraps logs
+mkdir -p download gcc33 gccwraps logs tmp
 
 download_files
 install_debfiles
