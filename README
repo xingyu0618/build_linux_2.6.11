@@ -1,0 +1,32 @@
+A script help to build Linux kernel 2.6.11.
+
+### Why bother building such an old kernel?
+
+Kernel 2.6.11 is detailed in the book UTLK, Understanding the Linux Kernel 2rd edition. I find it easier to read when using the same version as the author.
+
+Kernel 2.6.11 was released in 2005, though two decades old,
+in fact a quiet full-fledge kernel, and it's easier to understand
+than newer kernel versions.
+
+### How to built it
+The instruction about how to build this old kernel is elaborated in
+linux-2.6.11/Documentation/Changes
+
+```
+o  Gnu C                  2.95.3                  # gcc --version
+o  Gnu make               3.79.1                  # make --version
+o  binutils               2.12                    # ld -v
+o  util-linux             2.10o                   # fdformat --version
+o  module-init-tools      0.9.10                  # depmod -V
+o  e2fsprogs              1.29                    # tune2fs
+o  jfsutils               1.1.3                   # fsck.jfs -V
+o  reiserfsprogs          3.6.3                   # reiserfsck -V 2>&1|grep reiserfsprogs
+o  xfsprogs               2.6.0                   # xfs_db -V
+o  pcmcia-cs              3.1.21                  # cardmgr -V
+o  quota-tools            3.09                    # quota -V
+o  PPP                    2.4.0                   # pppd --version
+o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
+o  nfs-utils              1.0.5                   # showmount --version
+o  procps                 3.2.0                   # ps --version
+o  oprofile               0.5.3                   # oprofiled --version
+```
