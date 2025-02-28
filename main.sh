@@ -5,7 +5,7 @@ set -eE -o functrace
 on_error() {
   local lieno=$1
   local msg=$2
-  echo "[err] Failed at $lineno: $msg"
+  echo "[E] Failed at $lineno: $msg"
 }
 
 trap_error() {
@@ -34,14 +34,14 @@ check_in_source_tree() {
 }
 
 patch_fix_wrong_makefile() {
-  if grep -q '+ =' ./drivers/media/dvb/b2c2/Makefile; then
-    sed -i 's/+ =/+=/' ./drivers/media/dvb/b2c2/Makefile
+  if grep -q '+ =' $linux/drivers/media/dvb/b2c2/Makefile; then
+    sed -i 's/+ =/+=/' $linux/drivers/media/dvb/b2c2/Makefile
   fi
   echo "[*] patch fix drivers/media/dvb/b2c2/Makefile..done"
 }
 
 patch_change_HZ_100() {
-  file='include/asm-i386/param.h'
+  file="$linux/include/asm-i386/param.h"
   perl -i -pe 's/HZ\s+1000/HZ 100/' $file
   if ! grep -q '# define HZ 100' $file; then
     echo "[E] fail to change hz 100"
@@ -74,15 +74,19 @@ END
 }
 
 clean_kernel_source() {
+  cd $linux
+
   printf "[*] clean kernel source\n"
   if test -d .git; then
     # git clean -dn | grep --quiet --invert-match cleanbuild/
     git clean -df > /dev/null
     echo "    git clean -dn"
   else
-    ../domake mrproper
+    $domake mrproper
     echo "    make mrproper"
   fi
+
+  cd ..
 }
 
 create_makehelpers() {
@@ -105,7 +109,7 @@ END
   chmod +x $domake
   chmod +x $domake_bear
 
-  if ! grep -q '/ CC=' domake; then
+  if ! grep -q '/ CC=' $domake; then
     echo "[E] don't forget add trailing slash to CROSS_COMPILE"
     exit 1
   fi
@@ -114,10 +118,11 @@ END
 }
 
 do_config() {
-  cp ../config_patch .config
-  ruby ../oldnoconfig.rb &> oldnoconfig.log
+  cp config_patch $linux/.config
+  
+  ruby tools/oldnoconfig.rb $domake $linux &> logs/oldnoconfig.log
 
-  if grep -q CONFIG_KALLSYMS=y .config; then
+  if grep -q CONFIG_KALLSYMS=y $linux/.config; then
     echo "[E] CONFIG_KALLSYMS is found"
     exit 1
   fi
@@ -125,7 +130,7 @@ do_config() {
 }
 
 patch_disable_optimization() {
-  target_file=include/linux/byteorder/generic.h
+  target_file=$linux/include/linux/byteorder/generic.h
   target_text='#if defined(__GNUC__) && (__GNUC__ >= 2) && defined(__OPTIMIZE__)'
   target_line=155
   replace_text=$(cat <<END
@@ -149,8 +154,8 @@ else
 end
 END
 )
-  echo "$code" > disable_optimization.rb
-  ruby -i -n disable_optimization.rb $target_file
+  echo "$code" > tools/disable_optimization.rb
+  ruby -i -n tools/disable_optimization.rb $target_file
 
   echo "[*] disable optimization...done"
 }
@@ -235,28 +240,27 @@ unpack_kernel_source() {
 
 trap_error
 
-mkdir -p download
-mkdir -p gcc33
+mkdir -p download gcc33 gccwraps logs
 
 download_files
 install_debfiles
 patchelf_add_rpath
 unpack_kernel_source
 
-ccwrap=`realpath ccwrap`
-hostccwrap=`realpath hostccwrap`
+ccwrap=`realpath gccwraps/ccwrap`
+hostccwrap=`realpath gccwraps/hostccwrap`
 cross_compile=`realpath gcc33/usr/bin`
 
-domake=`realpath domake`
-domake_bear=`realpath domake_bear`
+domake=`realpath gccwraps/domake`
+domake_bear=`realpath gccwraps/domake_bear`
+linux=`realpath linux-2.6.11`
 
 arch=${1:-i386}
 
 create_gccwraps
 create_makehelpers
 
-cd linux-2.6.11
-echo -e "\n==== kconfig ===="
+echo -e "\n==== prepare .config ===="
 echo "[*] arch=$arch"
 
 # fix drivers/media/dvb/b2c2/Makefile before `make mrproper`
@@ -268,11 +272,12 @@ patch_disable_optimization
 
 do_config
 
-for x in `grep =y ../config_patch`; do
-  if ! grep -q $x .config; then
+for x in `grep =y config_patch`; do
+  if ! grep -q $x $linux/.config; then
     echo "[E] $x is not set in .config"
   fi
 done
 
+echo -e "======================="
 # make $makeflags oldconfig
 # bear -- make $makeflags

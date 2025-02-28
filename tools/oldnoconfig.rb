@@ -4,7 +4,22 @@ require 'irb'
 # `rm -f .config .config.old`
 # `cp .config.oldx .config`
 
-r,w,p = PTY.spawn('../domake oldconfig')
+domake_path=ARGV[0]
+linux_path=ARGV[1]
+
+unless test 'f', domake_path
+  puts "[E] invalid domake path #{domake_path}"
+  exit 1
+end
+
+unless test 'f', "#{linux_path}/Makefile"
+  puts "[E] invalid kernel path #{linux_path}"
+  exit 1
+end
+
+Dir.chdir linux_path
+
+r,w,p = PTY.spawn("#{domake_path} oldconfig")
 fp = File.open "conf_result", "w"
 loop do
   begin
