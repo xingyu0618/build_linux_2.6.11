@@ -1,9 +1,8 @@
 require 'pty'
 require 'irb'
 
-# `rm -f .config .config.old`
-# `cp .config.oldx .config`
-
+# kernel 2.6.11 does not provide `make oldnoconfig`
+# so I write this simple script to do that.
 domake_path=ARGV[0]
 linux_path=ARGV[1]
 
