@@ -120,7 +120,7 @@ END
 do_config() {
   cp config_patch $linux/.config
   
-  ruby tools/oldnoconfig.rb $domake $linux &> logs/oldnoconfig.log
+  ruby tools/oldnoconfig.rb $domake $linux `realpath logs/oldnoconfig.log`
 
   if grep -q CONFIG_KALLSYMS=y $linux/.config; then
     echo "[E] CONFIG_KALLSYMS is found"
