@@ -33,6 +33,8 @@ history=""
 
 loop do
   begin
+    # Need to read text chunk by chunk 
+    # because in the middle of process we'll be presented some questions.
     res = pty_read.read_nonblock(1024)
 
     # Redirect what reads from PTY to stdout to show the process.
@@ -44,20 +46,29 @@ loop do
       else
         lastline = res.strip
       end
-      # When encountering a new tristate symbol
-      # scripts/kconfig/conf presents something like this:
       # 
+      # When encountering a new symbol
+      # the last line has the following patterns
+      # 
+      # 1. Ask for yes or no
+      #    We answer no
+      # ------------------------------------------------------------------------------
       # Select only drivers expected to compile cleanly (CLEAN_COMPILE) [Y/n/?] (NEW)
       # ----------------------------------------------- --------------- -------
       #                prompt                             symbol name   options
       #
+      # 2. Ask for inputing something
+      #    We just print a new line into `pty_write to select the default.
+      #    The same as type ENTER on keyboard when doing so interactively in terminal.
+      # 
       # Local version - append to kernel release (LOCALVERSION) [] (NEW)
-      # ---------------------------------------- -------------- -- # empty options here
+      # ---------------------------------------- -------------- --
       #
       # Kernel log buffer size (16 => 64KB, 17 => 128KB) (LOG_BUF_SHIFT) [14] (NEW) 
-      # ------------------------------------------------ --------------- ---
+      # ------------------------------------------------ --------------- ----
+      #
       unless index = (lastline =~ /(\(\w*?\)) \[(.*?)\] \(NEW\)/)
-        raise '[E] unknown condition'
+        raise '[E] cannot match last line of a new symbol'
       end
       prompt = lastline[..index]
       symbol, options = $1, $2
@@ -76,7 +87,8 @@ loop do
         options_other.push [res, prompt, symbol, options]
       end
     elsif res.end_with? ']: '
-      binding.irb
+      # See comments at the end of file.
+      # binding.irb
       pty_write.puts
       choices.push [res]
     end
@@ -88,7 +100,7 @@ loop do
   end
 end
 
-binding.irb
+# binding.irb
 logfile.close
 
 #
