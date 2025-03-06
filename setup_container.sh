@@ -10,6 +10,6 @@ if which podman > /dev/null; then
 
   echo -e "\n[*] done, the newly created container is $hash"  
 else
-  echo "you need to install podman first."
+  echo -e "\n[E] you need to install podman first."
   exit 1
 fi

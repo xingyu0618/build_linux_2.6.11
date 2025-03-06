@@ -1,0 +1,6 @@
+.clangd
+include/
+initramfs.d/
+initramfs.unpack/
+test/
+utils/
