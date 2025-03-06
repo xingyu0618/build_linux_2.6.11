@@ -1,6 +1,10 @@
-#!/bin/bash
+#!/usr/bin/bash
 
-set -eE -o functrace
+set -o errexit  # set -e
+set -o errtrace # set -E
+set -o nounset  # set -u
+set -o pipefail
+set -o functrace
 
 on_error() {
   local lieno=$1
@@ -82,11 +86,46 @@ clean_kernel_source() {
     git clean -df > /dev/null
     echo "    git clean -dn"
   else
-    $domake mrproper
+    $domake mrproper &> /dev/null
     echo "    make mrproper"
   fi
 
   cd ..
+}
+
+__create_makehelpers() {
+  local outfile="$1"
+  local logfile="$2"
+
+  local bear_code=
+
+  if echo "$outfile" | grep -q bear; then
+    bear_code='bear --'
+  fi
+
+  cat > $outfile <<END
+#!/bin/bash
+set -eEu -o pipefail
+
+makeflags="$makeflags"
+
+user_args="\$@"
+
+main() {
+  echo -e "[*] user_args=\"\$user_args\"\n"
+  echo -e "[*] makeflags=\"\$makeflags\"\n"
+
+  echo -e "\n==== CLEAN START ====\n"
+
+  make \$makeflags clean
+  
+  echo -e "\n==== CLEAN DONE ====\n"
+
+  $bear_code make \$makeflags "\$user_args"
+}
+
+main 2>&1 | tee $logfile
+END
 }
 
 create_makehelpers() {
@@ -96,15 +135,8 @@ create_makehelpers() {
   makeflags+=" CC=$ccwrap"
   makeflags+=" HOSTCC=$hostccwrap"
 
-cat > $domake <<END
-#!/bin/bash
-make $makeflags "\$@"
-END
-
-cat > $domake_bear <<END
-#!/bin/bash
-bear -- make $makeflags "\$@"
-END
+  __create_makehelpers $domake $domake_log
+  __create_makehelpers $domake_bear $domake_bear_log
 
   chmod +x $domake
   chmod +x $domake_bear
@@ -117,10 +149,10 @@ END
   echo "[*] create makehelpers...done"
 }
 
-do_config() {
-  cp config_patch $linux/.config
+do_tiny_config() {
+  cp config_tiny $linux/.config
   
-  ruby tools/oldnoconfig.rb $domake $linux `realpath logs/oldnoconfig.log`
+  ruby tools/oldnoconfig.rb $domake $linux `realpath logs/oldnoconfig.log` &> logs/oldnoconfig.stdout
 
   if grep -q CONFIG_KALLSYMS=y $linux/.config; then
     echo "[E] CONFIG_KALLSYMS is found"
@@ -161,20 +193,20 @@ END
 }
 
 download() {
-  url=$1
-  sha=$2
+  local url=$1
+  local sha256=$2
 
   basename=`basename $url`
   destfile=download/`basename $url`
 
   printf "[*] download $basename..."
-  if test -f $destfile && sha256sum $destfile | grep -q $sha; then
+  if test -f $destfile && sha256sum $destfile | grep -q $sha256; then
     echo skip
     return
   fi
 
   wget -q --output-document=$destfile $url
-  if ! sha256sum download/`basename $url` | grep -q $sha; then
+  if ! sha256sum download/`basename $url` | grep -q $sha256; then
     echo "[E] fail to checksum $destfile"
     exit 1
   fi
@@ -194,6 +226,9 @@ download_files() {
 
   download https://archive.debian.org/debian/pool/main/b/binutils/binutils_2.15-6_i386.deb \
   f4a73c5ad1cba4c61b38bd83e6b0e493cc6a1a41d30bc010ae4969617d12bc9b
+
+  download https://archive.debian.org/debian/pool/main/b/busybox/busybox-static_0.60.5-2.2_i386.deb \
+  abf3d486b3106c4f4d93aa850e95e32d1d010976eb4bf3af6a20f2b2a755bfd3
 }
 
 install_debfiles() {
@@ -201,12 +236,16 @@ install_debfiles() {
   if gcc33/usr/bin/gcc-3.3 --help &> /dev/null && \
      gcc33/usr/bin/cpp-3.3 --help &> /dev/null && \
      test -f gcc33/usr/bin/ld; then
-    echo skip
-    return
+    # echo skip; return
+    # The installation isn't time-consuming and we will
+    # add more deb files in the future.
+    true
   fi
-  for debfile in gcc-3.3_3.3.5-13_i386.deb cpp-3.3_3.3.5-13_i386.deb binutils_2.15-6_i386.deb; do
-    dpkg-deb -x download/$debfile gcc33
+  
+  for debfile in `echo download/*.deb`; do
+    dpkg-deb -x $debfile gcc33
   done
+  
   echo done
 }
 
@@ -253,31 +292,35 @@ cross_compile=`realpath gcc33/usr/bin`
 
 domake=`realpath gccwraps/domake`
 domake_bear=`realpath gccwraps/domake_bear`
+domake_log=`realpath logs/domake`
+domake_bear_log=`realpath logs/domake_bear`
 linux=`realpath linux-2.6.11`
 
 arch=${1:-i386}
 
 create_gccwraps
 create_makehelpers
+# exit 0
 
-echo -e "\n==== prepare .config ===="
+echo
+echo "==== do_tinyconfig ===="
 echo "[*] arch=$arch"
 
 # fix drivers/media/dvb/b2c2/Makefile before `make mrproper`
 patch_fix_wrong_makefile
-clean_kernel_source
-
 patch_change_HZ_100
 patch_disable_optimization
 
-do_config
+# make mrproper or git clean -df if Git was setup.
+clean_kernel_source
+do_tiny_config
 
-for x in `grep =y config_patch`; do
+for x in `grep =y config_tiny`; do
   if ! grep -q $x $linux/.config; then
     echo "[E] $x is not set in .config"
   fi
 done
 
-echo -e "======================="
+echo "========================"
 # make $makeflags oldconfig
 # bear -- make $makeflags
